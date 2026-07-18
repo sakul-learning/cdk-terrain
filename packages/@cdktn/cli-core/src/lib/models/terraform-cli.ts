@@ -397,7 +397,9 @@ export class TerraformCli implements Terraform {
 
     // Transitions come from the actor's own subscription, which yields typed snapshots for the root actor only.
     let previousState: ReturnType<typeof service.getSnapshot>["value"] = "idle";
-    service.subscribe((snapshot) => {
+    const handleSnapshot = (
+      snapshot: ReturnType<typeof service.getSnapshot>,
+    ) => {
       // Only send updates on actual state change; a snapshot is emitted even when only an event happened.
       if (snapshot.matches(previousState)) return;
 
@@ -426,7 +428,12 @@ export class TerraformCli implements Terraform {
         });
       }
       previousState = snapshot.value;
-    });
+    };
+    service.subscribe(handleSnapshot);
+
+    // The service is already started by createService, so its initial transition may have happened before the
+    // subscription was attached. Process the current snapshot once to preserve the initial "running" callback.
+    handleSnapshot(service.getSnapshot());
 
     // stop terraform apply if signaled as such from the outside (e.g. via ctrl+c)
     this.abortSignal.addEventListener(
